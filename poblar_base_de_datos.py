@@ -81,28 +81,28 @@ def main():
                       "INSERT INTO Usuario (user_rut, nombre, email) VALUES (%s, %s, %s) ON CONFLICT (user_rut) DO NOTHING",
                       users)
 
-        # Ingenieros
+        # Ingenieros (sin especialidad)
         ing_ruts = []
         ings = []
-        especialidades = ["Backend", "Seguridad", "UI/UX"]
         base_ing = 20000000
         for i in range(NUM_ING):
             rut = base_ing + i
             ing_ruts.append(rut)
-            especialidad = random.sample(especialidades, 2)  # asigna 2 especialidades al azar
-            ings.append((rut, faker.name(), faker.email(), especialidad))
+            ings.append((rut, faker.name(), faker.email()))
         
         execute_batch(cur,
-                      "INSERT INTO Ingeniero (ing_rut, nombre_ing, email_ing, especialidad) VALUES (%s, %s, %s, %s) ON CONFLICT (ing_rut) DO NOTHING",
-                      [(ing[0], ing[1], ing[2], ', '.join(ing[3])) for ing in ings])
+                      "INSERT INTO Ingeniero (ing_rut, nombre_ing, email_ing) VALUES (%s, %s, %s) ON CONFLICT (ing_rut) DO NOTHING",
+                      [(ing[0], ing[1], ing[2]) for ing in ings])
 
         # Ingeniero_Especialidad: asignar 1-3 tópicos por ingeniero
         ing_especial = []
+        especialidades = ["Backend", "Seguridad", "UI/UX"]
         for ing in ing_ruts:
             k = random.randint(1, 3)
             chosen = random.sample(range(1, NUM_TOPICS + 1), k)
             for t in chosen:
-                ing_especial.append((t, ing, faker.word()))
+                especialidad = random.choice(especialidades)  # Elegir especialidad al azar
+                ing_especial.append((t, ing, especialidad))  # Insertar en Ingeniero_Especialidad
 
         if ing_especial:
             execute_batch(cur,
@@ -197,4 +197,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
