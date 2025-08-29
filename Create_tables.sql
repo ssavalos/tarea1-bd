@@ -2,7 +2,7 @@
 -- Ejemplo: CREATE TABLE usuarios (...);
 
 CREATE TABLE Usuario (
-    id_user INT PRIMARY KEY,
+    user_rut INT PRIMARY KEY,
     nombre VARCHAR(100),
     email VARCHAR(100)
 );
@@ -13,18 +13,18 @@ CREATE TABLE Topico (
 );
 
 CREATE TABLE Ingeniero (
-    id_ing INT PRIMARY KEY,
+    ing_rut INT PRIMARY KEY,
     nombre_ing VARCHAR(100),
     email_ing VARCHAR(100)
 );
 
 CREATE TABLE Ingeniero_Especialidad (
     id_topico INT,
-    id_ing INT,
+    ing_rut INT,
     especialidad VARCHAR(100),
-    PRIMARY KEY (id_topico, id_ing),
+    PRIMARY KEY (id_topico, ing_rut),
     FOREIGN KEY (id_topico) REFERENCES Topico(id_topico),
-    FOREIGN KEY (id_ing) REFERENCES Ingeniero(id_ing)
+    FOREIGN KEY (ing_rut) REFERENCES Ingeniero(ing_rut)
 );
 
 CREATE TABLE Funcionalidad (
@@ -35,9 +35,9 @@ CREATE TABLE Funcionalidad (
     estado_funcion VARCHAR(50),
     fecha_funcion DATE,
     id_topico INT,
-    id_user INT,
+    user_rut INT,
     FOREIGN KEY (id_topico) REFERENCES Topico(id_topico),
-    FOREIGN KEY (id_user) REFERENCES Usuario(id_user)
+    FOREIGN KEY (user_rut) REFERENCES Usuario(user_rut)
 );
 
 CREATE TABLE Criterio_Aceptacion (
@@ -54,23 +54,23 @@ CREATE TABLE ErrorBug (
     fecha_error DATE,
     estado_error VARCHAR(50),
     id_topico INT,
-    id_user INT,
+    user_rut INT,
     FOREIGN KEY (id_topico) REFERENCES Topico(id_topico),
-    FOREIGN KEY (id_user) REFERENCES Usuario(id_user)
+    FOREIGN KEY (user_rut) REFERENCES Usuario(user_rut)
 );
 
 CREATE TABLE Asignacion_Funcionalidad (
     id_funcionalidad INT,
-    id_ing INT,
-    PRIMARY KEY (id_funcionalidad, id_ing),
+    ing_rut INT,
+    PRIMARY KEY (id_funcionalidad, ing_rut),
     FOREIGN KEY (id_funcionalidad) REFERENCES Funcionalidad(id_funcionalidad),
-    FOREIGN KEY (id_ing) REFERENCES Ingeniero(id_ing)
+    FOREIGN KEY (ing_rut) REFERENCES Ingeniero(ing_rut)
 );
 
 CREATE TABLE Asignacion_Error (
     id_bug INT,
-    id_ing INT,
-    PRIMARY KEY (id_bug, id_ing),
+    ing_rut INT,
+    PRIMARY KEY (id_bug, ing_rut),
     FOREIGN KEY (id_bug) REFERENCES ErrorBug(id_bug),
-    FOREIGN KEY (id_ing) REFERENCES Ingeniero(id_ing)
+    FOREIGN KEY (ing_rut) REFERENCES Ingeniero(ing_rut)
 );
