@@ -22,7 +22,6 @@ from faker import Faker
 import psycopg2
 from psycopg2.extras import execute_batch
 
-
 load_dotenv()
 
 DB_NAME = os.getenv("DB_NAME")
@@ -42,6 +41,7 @@ NUM_ING = 50
 NUM_BUGS = 300
 NUM_FUNCS = 200
 NUM_TOPICS = 10
+NUM_CRITERIA = 3
 
 
 def random_date(start_year=2023, end_year=2025):
@@ -62,7 +62,7 @@ def main():
     cur = conn.cursor()
 
     try:
-        # Topicos
+        # Tópicos
         topics = [(i + 1, f"Tópico {i+1}") for i in range(NUM_TOPICS)]
         execute_batch(cur,
                       "INSERT INTO Topico (id_topico, nombre_topico) VALUES (%s, %s) ON CONFLICT (id_topico) DO NOTHING",
@@ -84,15 +84,17 @@ def main():
         # Ingenieros
         ing_ruts = []
         ings = []
+        especialidades = ["Backend", "Seguridad", "UI/UX"]
         base_ing = 20000000
         for i in range(NUM_ING):
             rut = base_ing + i
             ing_ruts.append(rut)
-            ings.append((rut, faker.name(), faker.email()))
-
+            especialidad = random.sample(especialidades, 2)  # asigna 2 especialidades al azar
+            ings.append((rut, faker.name(), faker.email(), especialidad))
+        
         execute_batch(cur,
-                      "INSERT INTO Ingeniero (ing_rut, nombre_ing, email_ing) VALUES (%s, %s, %s) ON CONFLICT (ing_rut) DO NOTHING",
-                      ings)
+                      "INSERT INTO Ingeniero (ing_rut, nombre_ing, email_ing, especialidad) VALUES (%s, %s, %s, %s) ON CONFLICT (ing_rut) DO NOTHING",
+                      [(ing[0], ing[1], ing[2], ', '.join(ing[3])) for ing in ings])
 
         # Ingeniero_Especialidad: asignar 1-3 tópicos por ingeniero
         ing_especial = []
@@ -113,7 +115,7 @@ def main():
             titulo = faker.sentence(nb_words=4).rstrip('.')
             ambiente = random.choice(["Producción", "Desarrollo", "Testing"])
             resumen = faker.paragraph(nb_sentences=3)
-            estado = random.choice(["nuevo", "en progreso", "completado"])
+            estado = random.choice(["abierto", "en progreso", "completado"])
             fecha = random_date(2023, 2025)
             id_topico = random.randint(1, NUM_TOPICS)
             user_rut = random.choice(user_ruts)
@@ -128,7 +130,7 @@ def main():
         criterios = []
         criterio_id = 1
         for fid in range(1, NUM_FUNCS + 1):
-            k = random.randint(1, 3)
+            k = random.randint(1, NUM_CRITERIA)
             for _ in range(k):
                 criterios.append((criterio_id, faker.sentence(nb_words=6), fid))
                 criterio_id += 1
@@ -195,3 +197,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+
