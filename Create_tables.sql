@@ -1,8 +1,7 @@
 -- Aquí van las tablas, llaves primarias y foráneas
--- Ejemplo: CREATE TABLE usuarios (...);
 
 CREATE TABLE Usuario (
-    user_rut INT PRIMARY KEY,
+    user_rut VARCHAR(12) PRIMARY KEY,
     nombre VARCHAR(100),
     email VARCHAR(100)
 );
@@ -13,14 +12,14 @@ CREATE TABLE Topico (
 );
 
 CREATE TABLE Ingeniero (
-    ing_rut INT PRIMARY KEY,
+    ing_rut VARCHAR(12) PRIMARY KEY,
     nombre_ing VARCHAR(100),
     email_ing VARCHAR(100)
 );
 
 CREATE TABLE Ingeniero_Especialidad (
     id_topico INT,
-    ing_rut INT,
+    ing_rut VARCHAR(12),
     especialidad VARCHAR(100),
     PRIMARY KEY (id_topico, ing_rut),
     FOREIGN KEY (id_topico) REFERENCES Topico(id_topico),
@@ -35,7 +34,7 @@ CREATE TABLE Funcionalidad (
     estado_funcion VARCHAR(50),
     fecha_funcion DATE,
     id_topico INT,
-    user_rut INT,
+    user_rut VARCHAR(12),
     FOREIGN KEY (id_topico) REFERENCES Topico(id_topico),
     FOREIGN KEY (user_rut) REFERENCES Usuario(user_rut)
 );
@@ -54,14 +53,14 @@ CREATE TABLE ErrorBug (
     fecha_error DATE,
     estado_error VARCHAR(50),
     id_topico INT,
-    user_rut INT,
+    user_rut VARCHAR(12),
     FOREIGN KEY (id_topico) REFERENCES Topico(id_topico),
     FOREIGN KEY (user_rut) REFERENCES Usuario(user_rut)
 );
 
 CREATE TABLE Asignacion_Funcionalidad (
     id_funcionalidad INT,
-    ing_rut INT,
+    ing_rut VARCHAR(12),
     PRIMARY KEY (id_funcionalidad, ing_rut),
     FOREIGN KEY (id_funcionalidad) REFERENCES Funcionalidad(id_funcionalidad),
     FOREIGN KEY (ing_rut) REFERENCES Ingeniero(ing_rut)
@@ -69,7 +68,7 @@ CREATE TABLE Asignacion_Funcionalidad (
 
 CREATE TABLE Asignacion_Error (
     id_bug INT,
-    ing_rut INT,
+    ing_rut VARCHAR(12),
     PRIMARY KEY (id_bug, ing_rut),
     FOREIGN KEY (id_bug) REFERENCES ErrorBug(id_bug),
     FOREIGN KEY (ing_rut) REFERENCES Ingeniero(ing_rut)

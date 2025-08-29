@@ -40,7 +40,7 @@ NUM_USERS = 50
 NUM_ING = 50
 NUM_BUGS = 300
 NUM_FUNCS = 200
-NUM_TOPICS = 10
+NUM_TOPICS = 3  # Tres tópicos específicos
 NUM_CRITERIA = 3
 
 
@@ -49,6 +49,13 @@ def random_date(start_year=2023, end_year=2025):
     end = datetime.date(end_year, 12, 31)
     days = (end - start).days
     return start + datetime.timedelta(days=random.randint(0, max(0, days)))
+
+
+def generate_rut():
+    """Genera un RUT chileno aleatorio en formato XXXXXXXX-X"""
+    rut = random.randint(10000000, 25000000)  # Genera un número aleatorio de RUT
+    dv = random.randint(0, 9)  # Genera un dígito verificador aleatorio
+    return f"{rut}-{dv}"
 
 
 def main():
@@ -62,8 +69,12 @@ def main():
     cur = conn.cursor()
 
     try:
-        # Tópicos
-        topics = [(i + 1, f"Tópico {i+1}") for i in range(NUM_TOPICS)]
+        # Tópicos (categorías específicas)
+        topics = [
+            (1, "Backend"),
+            (2, "Seguridad"),
+            (3, "UX/UI")
+        ]
         execute_batch(cur,
                       "INSERT INTO Topico (id_topico, nombre_topico) VALUES (%s, %s) ON CONFLICT (id_topico) DO NOTHING",
                       topics)
@@ -71,9 +82,8 @@ def main():
         # Usuarios
         user_ruts = []
         users = []
-        base_rut = 10000000
         for i in range(NUM_USERS):
-            rut = base_rut + i
+            rut = generate_rut()
             user_ruts.append(rut)
             users.append((rut, faker.name(), faker.email()))
 
@@ -81,12 +91,11 @@ def main():
                       "INSERT INTO Usuario (user_rut, nombre, email) VALUES (%s, %s, %s) ON CONFLICT (user_rut) DO NOTHING",
                       users)
 
-        # Ingenieros (sin especialidad)
+        # Ingenieros
         ing_ruts = []
         ings = []
-        base_ing = 20000000
         for i in range(NUM_ING):
-            rut = base_ing + i
+            rut = generate_rut()
             ing_ruts.append(rut)
             ings.append((rut, faker.name(), faker.email()))
         
@@ -110,12 +119,13 @@ def main():
                           ing_especial)
 
         # Funcionalidad
+        estados_func = ["Abierto", "En Progreso", "Resuelto", "Cerrado"]
         funcs = []
         for fid in range(1, NUM_FUNCS + 1):
-            titulo = faker.sentence(nb_words=4).rstrip('.')
-            ambiente = random.choice(["Producción", "Desarrollo", "Testing"])
-            resumen = faker.paragraph(nb_sentences=3)
-            estado = random.choice(["abierto", "en progreso", "completado"])
+            titulo = f"Funcionalidad {fid}"  # Generar título de funcionalidad más acorde
+            ambiente = random.choice(["Web", "Móvil"])  # Asignar ambiente "Web" o "Móvil"
+            resumen = faker.sentence(nb_words=10)  # Generar un resumen más realista
+            estado = random.choice(estados_func)  # Asignar estado aleatorio
             fecha = random_date(2023, 2025)
             id_topico = random.randint(1, NUM_TOPICS)
             user_rut = random.choice(user_ruts)
@@ -141,12 +151,13 @@ def main():
                           criterios)
 
         # ErrorBug
+        estados_bug = ["Abierto", "En Progreso", "Resuelto", "Cerrado"]
         bugs = []
         for bid in range(1, NUM_BUGS + 1):
-            titulo = faker.sentence(nb_words=5).rstrip('.')
-            descripcion = faker.paragraph(nb_sentences=4)
+            titulo = f"Error {bid}"  # Título más acorde con el contexto
+            descripcion = faker.paragraph(nb_sentences=2)  # Resumen más corto
             fecha = random_date(2023, 2025)
-            estado = random.choice(["abierto", "en progreso", "resuelto", "cerrado"])
+            estado = random.choice(estados_bug)  # Asignar estado aleatorio
             id_topico = random.randint(1, NUM_TOPICS)
             user_rut = random.choice(user_ruts)
             bugs.append((bid, titulo, descripcion, fecha, estado, id_topico, user_rut))
