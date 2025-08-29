@@ -1,27 +1,17 @@
 #!/usr/bin/env python3
 """despoblar_base_de_datos.py
 
-Elimina los datos insertados por `poblar_base_de_datos.py`.
+Script para eliminar los datos de la base de datos PostgreSQL definida en este repositorio.
 
-Modo seguro (por defecto): borra solo los rangos creados por el script de poblado.
-Modo total: pasar --all para truncar todas las tablas (destructivo).
-
-Asunciones:
-- Los usuarios tienen user_rut 12345678..12345699
-- Los ingenieros tienen ing_rut 98765432..98765469
-- Funcionalidades id 1..150
-- Errores id 1..250
-- Topicos id 1..5
-
-Ejecutar:
-python despoblar_base_de_datos.py      # modo seguro
-python despoblar_base_de_datos.py --all  # truncar todas las tablas
+Notas/Asunciones:
+- Elimina todos los registros de las tablas, manteniendo la estructura de la base de datos intacta.
+- Asegúrate de que el orden de eliminación respete las claves foráneas.
 """
-import os
-import sys
-from dotenv import load_dotenv
-import psycopg2
 
+from dotenv import load_dotenv
+import os
+import psycopg2
+from psycopg2.extras import execute_batch
 
 load_dotenv()
 
@@ -34,52 +24,7 @@ DB_PORT = os.getenv("DB_PORT")
 if not all([DB_NAME, DB_USER, DB_PASS, DB_HOST, DB_PORT]):
     raise SystemExit("Faltan variables de entorno DB_*; revisa tu archivo .env")
 
-
-def confirm(prompt="¿Continuar? (si/no): "):
-    ans = input(prompt).strip().lower()
-    return ans in ("s", "si", "y", "yes")
-
-
-def despoblar_por_rangos(cur):
-    # Borrar asignaciones primero por FK
-    stmts = [
-        ("DELETE FROM Asignacion_Error WHERE id_bug BETWEEN 1 AND 250;", "Asignacion_Error"),
-        ("DELETE FROM Asignacion_Funcionalidad WHERE id_funcionalidad BETWEEN 1 AND 150;", "Asignacion_Funcionalidad"),
-        ("DELETE FROM Criterio_Aceptacion WHERE id_funcionalidad BETWEEN 1 AND 150;", "Criterio_Aceptacion"),
-        ("DELETE FROM ErrorBug WHERE id_bug BETWEEN 1 AND 250;", "ErrorBug"),
-        ("DELETE FROM Funcionalidad WHERE id_funcionalidad BETWEEN 1 AND 150;", "Funcionalidad"),
-        ("DELETE FROM Ingeniero_Especialidad WHERE ing_rut BETWEEN 98765432 AND 98765469;", "Ingeniero_Especialidad"),
-        ("DELETE FROM Ingeniero WHERE ing_rut BETWEEN 98765432 AND 98765469;", "Ingeniero"),
-        ("DELETE FROM Usuario WHERE user_rut BETWEEN 12345678 AND 12345699;", "Usuario"),
-        ("DELETE FROM Topico WHERE id_topico BETWEEN 1 AND 5;", "Topico"),
-    ]
-
-    results = {}
-    for sql, name in stmts:
-        cur.execute(sql)
-        results[name] = cur.rowcount
-    return results
-
-
-def truncar_todo(cur):
-    # Trunca en cascada para manejar FKs automáticamente
-    cur.execute(
-        "TRUNCATE TABLE Asignacion_Error, Asignacion_Funcionalidad, Criterio_Aceptacion, ErrorBug, Funcionalidad, Ingeniero_Especialidad, Ingeniero, Usuario, Topico RESTART IDENTITY CASCADE;"
-    )
-    return {"truncated": True}
-
-
 def main():
-    force_all = "--all" in sys.argv
-    assume_yes = "--yes" in sys.argv or "-y" in sys.argv
-
-    print("Modo:", "TRUNCATE ALL tablas" if force_all else "Borrado por rangos (seguro)")
-    if not assume_yes:
-        ok = confirm("ESTO ES PELIGROSO: deseas continuar? (si/no): ")
-        if not ok:
-            print("Operación cancelada.")
-            return
-
     conn = psycopg2.connect(
         dbname=DB_NAME,
         user=DB_USER,
@@ -90,28 +35,46 @@ def main():
     cur = conn.cursor()
 
     try:
-        if force_all:
-            res = truncar_todo(cur)
-            conn.commit()
-            print("Truncado completo de tablas realizado.")
-        else:
-            res = despoblar_por_rangos(cur)
-            conn.commit()
-            print("Borrado por rangos completado. Filas afectadas por tabla:")
-            for k, v in res.items():
-                print(f"  {k}: {v}")
+        # Eliminar datos en el orden correcto para evitar conflictos de claves foráneas.
+        
+        # 1. Eliminar registros de asignación de errores (hijos primero)
+        cur.execute("DELETE FROM Asignacion_Error;")
+        
+        # 2. Eliminar registros de asignación de funcionalidades
+        cur.execute("DELETE FROM Asignacion_Funcionalidad;")
+        
+        # 3. Eliminar los criterios de aceptación
+        cur.execute("DELETE FROM Criterio_Aceptacion;")
+        
+        # 4. Eliminar los errores
+        cur.execute("DELETE FROM ErrorBug;")
+        
+        # 5. Eliminar las funcionalidades
+        cur.execute("DELETE FROM Funcionalidad;")
+        
+        # 6. Eliminar las especialidades de los ingenieros
+        cur.execute("DELETE FROM Ingeniero_Especialidad;")
+        
+        # 7. Eliminar los ingenieros
+        cur.execute("DELETE FROM Ingeniero;")
+        
+        # 8. Eliminar los usuarios
+        cur.execute("DELETE FROM Usuario;")
+        
+        # 9. Finalmente, eliminar los tópicos
+        cur.execute("DELETE FROM Topico;")
+
+        conn.commit()
+
+        print("Datos eliminados correctamente.")
 
     except Exception as e:
         conn.rollback()
-        print("Error durante el despoblado:", e)
+        print(f"Ocurrió un error: {e}")
+        raise
     finally:
         cur.close()
         conn.close()
-
-
-if __name__ == '__main__':
-    main()
-
 
 
 if __name__ == '__main__':
