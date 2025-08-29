@@ -7,11 +7,11 @@ Modo seguro (por defecto): borra solo los rangos creados por el script de poblad
 Modo total: pasar --all para truncar todas las tablas (destructivo).
 
 Asunciones:
-- Los usuarios tienen user_rut 10000000..10000049
-- Los ingenieros tienen ing_rut 20000000..20000049
-- Funcionalidades id 1..200
-- Errores id 1..300
-- Topicos id 1..10
+- Los usuarios tienen user_rut 12345678..12345699
+- Los ingenieros tienen ing_rut 98765432..98765469
+- Funcionalidades id 1..150
+- Errores id 1..250
+- Topicos id 1..5
 
 Ejecutar:
 python despoblar_base_de_datos.py      # modo seguro
@@ -43,15 +43,15 @@ def confirm(prompt="¿Continuar? (si/no): "):
 def despoblar_por_rangos(cur):
     # Borrar asignaciones primero por FK
     stmts = [
-        ("DELETE FROM Asignacion_Error WHERE id_bug BETWEEN 1 AND 300;", "Asignacion_Error"),
-        ("DELETE FROM Asignacion_Funcionalidad WHERE id_funcionalidad BETWEEN 1 AND 200;", "Asignacion_Funcionalidad"),
-        ("DELETE FROM Criterio_Aceptacion WHERE id_funcionalidad BETWEEN 1 AND 200;", "Criterio_Aceptacion"),
-        ("DELETE FROM ErrorBug WHERE id_bug BETWEEN 1 AND 300;", "ErrorBug"),
-        ("DELETE FROM Funcionalidad WHERE id_funcionalidad BETWEEN 1 AND 200;", "Funcionalidad"),
-        ("DELETE FROM Ingeniero_Especialidad WHERE ing_rut BETWEEN 20000000 AND 20000049;", "Ingeniero_Especialidad"),
-        ("DELETE FROM Ingeniero WHERE ing_rut BETWEEN 20000000 AND 20000049;", "Ingeniero"),
-        ("DELETE FROM Usuario WHERE user_rut BETWEEN 10000000 AND 10000049;", "Usuario"),
-        ("DELETE FROM Topico WHERE id_topico BETWEEN 1 AND 10;", "Topico"),
+        ("DELETE FROM Asignacion_Error WHERE id_bug BETWEEN 1 AND 250;", "Asignacion_Error"),
+        ("DELETE FROM Asignacion_Funcionalidad WHERE id_funcionalidad BETWEEN 1 AND 150;", "Asignacion_Funcionalidad"),
+        ("DELETE FROM Criterio_Aceptacion WHERE id_funcionalidad BETWEEN 1 AND 150;", "Criterio_Aceptacion"),
+        ("DELETE FROM ErrorBug WHERE id_bug BETWEEN 1 AND 250;", "ErrorBug"),
+        ("DELETE FROM Funcionalidad WHERE id_funcionalidad BETWEEN 1 AND 150;", "Funcionalidad"),
+        ("DELETE FROM Ingeniero_Especialidad WHERE ing_rut BETWEEN 98765432 AND 98765469;", "Ingeniero_Especialidad"),
+        ("DELETE FROM Ingeniero WHERE ing_rut BETWEEN 98765432 AND 98765469;", "Ingeniero"),
+        ("DELETE FROM Usuario WHERE user_rut BETWEEN 12345678 AND 12345699;", "Usuario"),
+        ("DELETE FROM Topico WHERE id_topico BETWEEN 1 AND 5;", "Topico"),
     ]
 
     results = {}
@@ -107,6 +107,11 @@ def main():
     finally:
         cur.close()
         conn.close()
+
+
+if __name__ == '__main__':
+    main()
+
 
 
 if __name__ == '__main__':
