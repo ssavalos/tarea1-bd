@@ -1,0 +1,2 @@
+-- Aquí van los INSERT para poblar con datos de prueba
+-- Ejemplo: INSERT INTO usuarios VALUES (...);

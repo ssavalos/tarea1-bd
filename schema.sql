@@ -1,0 +1,2 @@
+-- Aquí van las tablas, llaves primarias y foráneas
+-- Ejemplo: CREATE TABLE usuarios (...);

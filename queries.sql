@@ -1,0 +1,2 @@
+-- Aquí van las consultas de la Tarea 1
+-- Ejemplo: SELECT nombre FROM ingenieros WHERE ...;
