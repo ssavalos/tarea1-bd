@@ -29,7 +29,7 @@ try:
         cur.execute(f"CREATE DATABASE {DB_NAME}")
         print(f"Base de datos '{DB_NAME}' creada.")
     else:
-        print(f"ℹ La base de datos '{DB_NAME}' ya existe.")
+        print(f"La base de datos '{DB_NAME}' ya existe.")
 
     cur.close()
     conn.close()
