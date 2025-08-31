@@ -1,17 +1,10 @@
 #!/usr/bin/env python3
-"""despoblar_base_de_datos.py
-
-Script para eliminar los datos de la base de datos PostgreSQL definida en este repositorio.
-
-Notas/Asunciones:
-- Elimina todos los registros de las tablas, manteniendo la estructura de la base de datos intacta.
-- Asegúrate de que el orden de eliminación respete las claves foráneas.
-"""
+# despoblar_base_de_datos.py
+# Vacía todas las tablas de la BD (mantiene el esquema).
 
 from dotenv import load_dotenv
 import os
 import psycopg2
-from psycopg2.extras import execute_batch
 
 load_dotenv()
 
@@ -24,6 +17,20 @@ DB_PORT = os.getenv("DB_PORT")
 if not all([DB_NAME, DB_USER, DB_PASS, DB_HOST, DB_PORT]):
     raise SystemExit("Faltan variables de entorno DB_*; revisa tu archivo .env")
 
+TABLES = [
+    # Orden no crítico porque usamos CASCADE,
+    # pero listamos todas por claridad/coincidir con Create_tables.sql
+    "Asignacion_Error",
+    "Asignacion_Funcionalidad",
+    "Criterio_Aceptacion",
+    "ErrorBug",
+    "Funcionalidad",
+    "Ingeniero_Especialidad",
+    "Ingeniero",
+    "Usuario",
+    "Topico",
+]
+
 def main():
     conn = psycopg2.connect(
         dbname=DB_NAME,
@@ -32,42 +39,14 @@ def main():
         host=DB_HOST,
         port=DB_PORT,
     )
+    conn.autocommit = False
     cur = conn.cursor()
-
     try:
-        # Eliminar datos en el orden correcto para evitar conflictos de claves foráneas.
-        
-        # 1. Eliminar registros de asignación de errores (hijos primero)
-        cur.execute("DELETE FROM Asignacion_Error;")
-        
-        # 2. Eliminar registros de asignación de funcionalidades
-        cur.execute("DELETE FROM Asignacion_Funcionalidad;")
-        
-        # 3. Eliminar los criterios de aceptación
-        cur.execute("DELETE FROM Criterio_Aceptacion;")
-        
-        # 4. Eliminar los errores
-        cur.execute("DELETE FROM ErrorBug;")
-        
-        # 5. Eliminar las funcionalidades
-        cur.execute("DELETE FROM Funcionalidad;")
-        
-        # 6. Eliminar las especialidades de los ingenieros
-        cur.execute("DELETE FROM Ingeniero_Especialidad;")
-        
-        # 7. Eliminar los ingenieros
-        cur.execute("DELETE FROM Ingeniero;")
-        
-        # 8. Eliminar los usuarios
-        cur.execute("DELETE FROM Usuario;")
-        
-        # 9. Finalmente, eliminar los tópicos
-        cur.execute("DELETE FROM Topico;")
-
+        # TRUNCATE rápido y seguro con CASCADE
+        stmt = "TRUNCATE {} RESTART IDENTITY CASCADE;".format(", ".join(TABLES))
+        cur.execute(stmt)
         conn.commit()
-
-        print("Datos eliminados correctamente.")
-
+        print("Datos eliminados correctamente (TRUNCATE CASCADE).")
     except Exception as e:
         conn.rollback()
         print(f"Ocurrió un error: {e}")
@@ -76,6 +55,5 @@ def main():
         cur.close()
         conn.close()
 
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
