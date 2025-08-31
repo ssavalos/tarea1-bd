@@ -8,12 +8,8 @@ Genera:
 - 50 Ingenieros
 - 300 ErrorBug
 - 200 Funcionalidad
-
-Notas/Asunciones:
-- Usa variables de entorno: DB_NAME, DB_USER, DB_PASS, DB_HOST, DB_PORT (cargadas desde .env)
-- No trunca tablas; usa INSERT ... ON CONFLICT DO NOTHING para evitar errores si ya hay datos.
-- Requiere las dependencias listadas en requirements.txt (psycopg2-binary, python-dotenv, faker).
 """
+
 from dotenv import load_dotenv
 import os
 import random
@@ -53,8 +49,8 @@ def random_date(start_year=2023, end_year=2025):
 
 def generate_rut():
     """Genera un RUT chileno aleatorio en formato XXXXXXXX-X"""
-    rut = random.randint(10000000, 25000000)  # Genera un número aleatorio de RUT
-    dv = random.randint(0, 9)  # Genera un dígito verificador aleatorio
+    rut = random.randint(10000000, 25000000)
+    dv = random.randint(0, 9)
     return f"{rut}-{dv}"
 
 
@@ -69,7 +65,7 @@ def main():
     cur = conn.cursor()
 
     try:
-        # Tópicos (categorías específicas)
+        # Tópicos
         topics = [
             (1, "Backend"),
             (2, "Seguridad"),
@@ -103,29 +99,27 @@ def main():
                       "INSERT INTO Ingeniero (ing_rut, nombre_ing, email_ing) VALUES (%s, %s, %s) ON CONFLICT (ing_rut) DO NOTHING",
                       [(ing[0], ing[1], ing[2]) for ing in ings])
 
-        # Ingeniero_Especialidad: asignar 1-3 tópicos por ingeniero
+        # Ingeniero_Especialidad (solo id_topico e ing_rut, SIN especialidad)
         ing_especial = []
-        especialidades = ["Backend", "Seguridad", "UI/UX"]
         for ing in ing_ruts:
-            k = random.randint(1, 3)
+            k = random.randint(1, NUM_TOPICS)  # de 1 a 3 tópicos
             chosen = random.sample(range(1, NUM_TOPICS + 1), k)
             for t in chosen:
-                especialidad = random.choice(especialidades)  # Elegir especialidad al azar
-                ing_especial.append((t, ing, especialidad))  # Insertar en Ingeniero_Especialidad
+                ing_especial.append((t, ing))
 
         if ing_especial:
             execute_batch(cur,
-                          "INSERT INTO Ingeniero_Especialidad (id_topico, ing_rut, especialidad) VALUES (%s, %s, %s) ON CONFLICT (id_topico, ing_rut) DO NOTHING",
+                          "INSERT INTO Ingeniero_Especialidad (id_topico, ing_rut) VALUES (%s, %s) ON CONFLICT (id_topico, ing_rut) DO NOTHING",
                           ing_especial)
 
         # Funcionalidad
         estados_func = ["Abierto", "En Progreso", "Resuelto", "Cerrado"]
         funcs = []
         for fid in range(1, NUM_FUNCS + 1):
-            titulo = f"Funcionalidad {fid}"  # Generar título de funcionalidad más acorde
-            ambiente = random.choice(["Web", "Móvil"])  # Asignar ambiente "Web" o "Móvil"
-            resumen = faker.sentence(nb_words=10)  # Generar un resumen más realista
-            estado = random.choice(estados_func)  # Asignar estado aleatorio
+            titulo = f"Funcionalidad {fid}"
+            ambiente = random.choice(["Web", "Móvil"])
+            resumen = faker.sentence(nb_words=10)
+            estado = random.choice(estados_func)
             fecha = random_date(2023, 2025)
             id_topico = random.randint(1, NUM_TOPICS)
             user_rut = random.choice(user_ruts)
@@ -136,7 +130,7 @@ def main():
                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s) ON CONFLICT (id_funcionalidad) DO NOTHING""",
                       funcs)
 
-        # Criterios de aceptación: 1-3 por funcionalidad
+        # Criterios de aceptación
         criterios = []
         criterio_id = 1
         for fid in range(1, NUM_FUNCS + 1):
@@ -154,10 +148,10 @@ def main():
         estados_bug = ["Abierto", "En Progreso", "Resuelto", "Cerrado"]
         bugs = []
         for bid in range(1, NUM_BUGS + 1):
-            titulo = f"Error {bid}"  # Título más acorde con el contexto
-            descripcion = faker.paragraph(nb_sentences=2)  # Resumen más corto
+            titulo = f"Error {bid}"
+            descripcion = faker.paragraph(nb_sentences=2)
             fecha = random_date(2023, 2025)
-            estado = random.choice(estados_bug)  # Asignar estado aleatorio
+            estado = random.choice(estados_bug)
             id_topico = random.randint(1, NUM_TOPICS)
             user_rut = random.choice(user_ruts)
             bugs.append((bid, titulo, descripcion, fecha, estado, id_topico, user_rut))
@@ -167,7 +161,7 @@ def main():
                       VALUES (%s, %s, %s, %s, %s, %s, %s) ON CONFLICT (id_bug) DO NOTHING""",
                       bugs)
 
-        # Asignaciones de funcionalidad: 1-2 ingenieros por funcionalidad
+        # Asignaciones de funcionalidades
         asign_funcs = []
         for fid in range(1, NUM_FUNCS + 1):
             k = random.randint(1, 2)
@@ -180,7 +174,7 @@ def main():
                           "INSERT INTO Asignacion_Funcionalidad (id_funcionalidad, ing_rut) VALUES (%s, %s) ON CONFLICT (id_funcionalidad, ing_rut) DO NOTHING",
                           asign_funcs)
 
-        # Asignaciones de errores: 1-2 ingenieros por bug
+        # Asignaciones de errores
         asign_bugs = []
         for bid in range(1, NUM_BUGS + 1):
             k = random.randint(1, 2)
