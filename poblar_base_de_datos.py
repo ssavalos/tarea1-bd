@@ -5,7 +5,7 @@ Script para poblar la base de datos PostgreSQL definida en este repositorio.
 
 Genera:
 - 50 Usuarios
-- 50 Ingenieros
+- 80 Ingenieros
 - 300 ErrorBug
 - 200 Funcionalidad
 """
@@ -17,6 +17,7 @@ import datetime
 from faker import Faker
 import psycopg2
 from psycopg2.extras import execute_batch
+from collections import defaultdict, Counter
 
 load_dotenv()
 
@@ -33,10 +34,10 @@ faker = Faker('es_ES')
 random.seed(42)
 
 NUM_USERS = 50
-NUM_ING = 50
+NUM_ING = 80
 NUM_BUGS = 300
 NUM_FUNCS = 200
-NUM_TOPICS = 3  # Tres tópicos específicos
+NUM_TOPICS = 3  # Backend, Seguridad, UX/UI
 NUM_CRITERIA = 3
 
 
@@ -49,8 +50,9 @@ def random_date(start_year=2023, end_year=2025):
 
 def generate_rut():
     """Genera un RUT chileno aleatorio en formato XXXXXXXX-X"""
-    rut = random.randint(10000000, 25000000)
-    dv = random.randint(0, 9)
+    rut = random.randint(1_000_000, 25_000_000)
+    dv_options = list(map(str, range(10))) + ["K"]
+    dv = random.choice(dv_options)
     return f"{rut}-{dv}"
 
 
@@ -64,135 +66,241 @@ def main():
     )
     cur = conn.cursor()
 
+    # === Ejecutar Triggers.sql antes de poblar (idempotente) ===
+    def run_sql_file(cur, filename):
+        if not os.path.exists(filename):
+            raise FileNotFoundError(f"No se encontró el archivo SQL: {filename}")
+        with open(filename, "r", encoding="utf-8") as f:
+            cur.execute(f.read())
+
     try:
-        # Tópicos
+        run_sql_file(cur, "Triggers.sql")
+        conn.commit()
+        print("Triggers creados/actualizados desde 'Triggers.sql'.")
+    except Exception as e:
+        conn.rollback()
+        raise RuntimeError(f"Error al ejecutar 'Triggers.sql': {e}")
+
+    try:
+        # ======================
+        # 1) Catálogo de tópicos
+        # ======================
         topics = [
             (1, "Backend"),
             (2, "Seguridad"),
-            (3, "UX/UI")
+            (3, "UX/UI"),
         ]
-        execute_batch(cur,
-                      "INSERT INTO Topico (id_topico, nombre_topico) VALUES (%s, %s) ON CONFLICT (id_topico) DO NOTHING",
-                      topics)
+        execute_batch(
+            cur,
+            "INSERT INTO Topico (id_topico, nombre_topico) VALUES (%s, %s) "
+            "ON CONFLICT (id_topico) DO NOTHING",
+            topics,
+        )
 
-        # Usuarios
-        user_ruts = []
-        users = []
-        for i in range(NUM_USERS):
+        # ===============
+        # 2) Usuarios
+        # ===============
+        user_ruts, users = [], []
+        for _ in range(NUM_USERS):
             rut = generate_rut()
             user_ruts.append(rut)
             users.append((rut, faker.name(), faker.email()))
+        execute_batch(
+            cur,
+            "INSERT INTO Usuario (user_rut, nombre, email) VALUES (%s, %s, %s) "
+            "ON CONFLICT (user_rut) DO NOTHING",
+            users,
+        )
 
-        execute_batch(cur,
-                      "INSERT INTO Usuario (user_rut, nombre, email) VALUES (%s, %s, %s) ON CONFLICT (user_rut) DO NOTHING",
-                      users)
-
-        # Ingenieros
-        ing_ruts = []
-        ings = []
-        for i in range(NUM_ING):
+        # ===============
+        # 3) Ingenieros
+        # ===============
+        ing_ruts, ings = [], []
+        for _ in range(NUM_ING):
             rut = generate_rut()
             ing_ruts.append(rut)
             ings.append((rut, faker.name(), faker.email()))
-        
-        execute_batch(cur,
-                      "INSERT INTO Ingeniero (ing_rut, nombre_ing, email_ing) VALUES (%s, %s, %s) ON CONFLICT (ing_rut) DO NOTHING",
-                      [(ing[0], ing[1], ing[2]) for ing in ings])
+        execute_batch(
+            cur,
+            "INSERT INTO Ingeniero (ing_rut, nombre_ing, email_ing) VALUES (%s, %s, %s) "
+            "ON CONFLICT (ing_rut) DO NOTHING",
+            ings,
+        )
 
-        # Ingeniero_Especialidad (solo id_topico e ing_rut, SIN especialidad)
+        # ==========================================
+        # 4) Especialidades (1–2 por ingeniero)
+        # ==========================================
         ing_especial = []
         for ing in ing_ruts:
-            k = random.randint(1, NUM_TOPICS)  # de 1 a 3 tópicos
-            chosen = random.sample(range(1, NUM_TOPICS + 1), k)
-            for t in chosen:
+            k = random.randint(1, min(2, NUM_TOPICS))  # máx 2 por trigger
+            for t in random.sample(range(1, NUM_TOPICS + 1), k):
                 ing_especial.append((t, ing))
 
         if ing_especial:
-            execute_batch(cur,
-                          "INSERT INTO Ingeniero_Especialidad (id_topico, ing_rut) VALUES (%s, %s) ON CONFLICT (id_topico, ing_rut) DO NOTHING",
-                          ing_especial)
+            execute_batch(
+                cur,
+                "INSERT INTO Ingeniero_Especialidad (id_topico, ing_rut) VALUES (%s, %s) "
+                "ON CONFLICT (id_topico, ing_rut) DO NOTHING",
+                ing_especial,
+            )
 
-        # Funcionalidad
+        # ---- Asegurar ≥ 3 especialistas por cada tópico (para poder asignar 3) ----
+        cur.execute("SELECT id_topico, COUNT(*) FROM Ingeniero_Especialidad GROUP BY id_topico")
+        faltantes = {t: max(0, 3 - c) for t, c in cur.fetchall()}
+        for t, faltan in faltantes.items():
+            while faltan > 0:
+                cand = random.choice(ing_ruts)
+                # respeta el trigger de máx. 2 especialidades
+                cur.execute("SELECT COUNT(*) FROM Ingeniero_Especialidad WHERE ing_rut = %s", (cand,))
+                if cur.fetchone()[0] >= 2:
+                    continue
+                # evita duplicar misma especialidad
+                cur.execute(
+                    "SELECT 1 FROM Ingeniero_Especialidad WHERE ing_rut = %s AND id_topico = %s",
+                    (cand, t),
+                )
+                if cur.fetchone():
+                    continue
+                cur.execute(
+                    "INSERT INTO Ingeniero_Especialidad (id_topico, ing_rut) VALUES (%s, %s) "
+                    "ON CONFLICT DO NOTHING",
+                    (t, cand),
+                )
+                faltan -= 1
+
+        # ===================================
+        # 5) Funcionalidades (con tope 25/día)
+        # ===================================
         estados_func = ["Abierto", "En Progreso", "Resuelto", "Cerrado"]
+        cuenta_func_dia = defaultdict(int)  # (user_rut, fecha) -> conteo
         funcs = []
         for fid in range(1, NUM_FUNCS + 1):
+            # respetar trigger: máx 25 por día/usuario
+            while True:
+                fecha = random_date(2023, 2025)
+                user_rut = random.choice(user_ruts)
+                if cuenta_func_dia[(user_rut, fecha)] < 25:
+                    cuenta_func_dia[(user_rut, fecha)] += 1
+                    break
+
             titulo = f"Funcionalidad {fid}"
             ambiente = random.choice(["Web", "Móvil"])
             resumen = faker.sentence(nb_words=10)
             estado = random.choice(estados_func)
-            fecha = random_date(2023, 2025)
             id_topico = random.randint(1, NUM_TOPICS)
-            user_rut = random.choice(user_ruts)
-            funcs.append((fid, titulo, ambiente, resumen, estado, fecha, id_topico, user_rut))
 
-        execute_batch(cur,
-                      """INSERT INTO Funcionalidad (id_funcionalidad, titulo_funcion, ambiente, resumen, estado_funcion, fecha_funcion, id_topico, user_rut)
-                      VALUES (%s, %s, %s, %s, %s, %s, %s, %s) ON CONFLICT (id_funcionalidad) DO NOTHING""",
-                      funcs)
+            funcs.append(
+                (fid, titulo, ambiente, resumen, estado, fecha, id_topico, user_rut)
+            )
 
-        # Criterios de aceptación
-        criterios = []
-        criterio_id = 1
+        execute_batch(
+            cur,
+            "INSERT INTO Funcionalidad "
+            "(id_funcionalidad, titulo_funcion, ambiente, resumen, estado_funcion, fecha_funcion, id_topico, user_rut) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s) "
+            "ON CONFLICT (id_funcionalidad) DO NOTHING",
+            funcs,
+        )
+
+        # ===============================
+        # 6) Criterios de aceptación (3)
+        # ===============================
+        criterios, criterio_id = [], 1
         for fid in range(1, NUM_FUNCS + 1):
-            k = random.randint(1, NUM_CRITERIA)
-            for _ in range(k):
+            for _ in range(NUM_CRITERIA):
                 criterios.append((criterio_id, faker.sentence(nb_words=6), fid))
                 criterio_id += 1
+        execute_batch(
+            cur,
+            "INSERT INTO Criterio_Aceptacion (id_criterio, descripcion_criterio, id_funcionalidad) "
+            "VALUES (%s, %s, %s) ON CONFLICT (id_criterio) DO NOTHING",
+            criterios,
+        )
 
-        if criterios:
-            execute_batch(cur,
-                          "INSERT INTO Criterio_Aceptacion (id_criterio, descripcion_criterio, id_funcionalidad) VALUES (%s, %s, %s) ON CONFLICT (id_criterio) DO NOTHING",
-                          criterios)
-
-        # ErrorBug
+        # =================================
+        # 7) Errores (con tope 25 por día)
+        # =================================
         estados_bug = ["Abierto", "En Progreso", "Resuelto", "Cerrado"]
+        cuenta_bug_dia = defaultdict(int)  # (user_rut, fecha) -> conteo
         bugs = []
         for bid in range(1, NUM_BUGS + 1):
+            # respetar trigger: máx 25 por día/usuario
+            while True:
+                fecha = random_date(2023, 2025)
+                user_rut = random.choice(user_ruts)
+                if cuenta_bug_dia[(user_rut, fecha)] < 25:
+                    cuenta_bug_dia[(user_rut, fecha)] += 1
+                    break
+
             titulo = f"Error {bid}"
             descripcion = faker.paragraph(nb_sentences=2)
-            fecha = random_date(2023, 2025)
             estado = random.choice(estados_bug)
             id_topico = random.randint(1, NUM_TOPICS)
-            user_rut = random.choice(user_ruts)
+
             bugs.append((bid, titulo, descripcion, fecha, estado, id_topico, user_rut))
 
-        execute_batch(cur,
-                      """INSERT INTO ErrorBug (id_bug, titulo_error, descripcion, fecha_error, estado_error, id_topico, user_rut)
-                      VALUES (%s, %s, %s, %s, %s, %s, %s) ON CONFLICT (id_bug) DO NOTHING""",
-                      bugs)
+        execute_batch(
+            cur,
+            "INSERT INTO ErrorBug "
+            "(id_bug, titulo_error, descripcion, fecha_error, estado_error, id_topico, user_rut) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s) "
+            "ON CONFLICT (id_bug) DO NOTHING",
+            bugs,
+        )
 
-        # Asignaciones de funcionalidades
+        # ===========================================================
+        # 8) Asignaciones: exactamente 3 especialistas por solicitud
+        # ===========================================================
+        especialistas_por_topico = defaultdict(list)
+        cur.execute("SELECT id_topico, ing_rut FROM Ingeniero_Especialidad")
+        for t, r in cur.fetchall():
+            especialistas_por_topico[t].append(r)
+
+        conteo_asign = Counter()  # total (func + error) por ingeniero
+
+        def elegir_3(topico):
+            pool = [r for r in especialistas_por_topico[topico] if conteo_asign[r] < 20]
+            if len(pool) < 3:
+                pool = especialistas_por_topico[topico][:]  # fallback si el tope 20 aprieta
+            elegidos = random.sample(pool, 3)
+            for r in elegidos:
+                conteo_asign[r] += 1
+            return elegidos
+
         asign_funcs = []
-        for fid in range(1, NUM_FUNCS + 1):
-            k = random.randint(1, 2)
-            chosen = random.sample(ing_ruts, k)
-            for ing in chosen:
+        for (fid, _titulo, _amb, _res, _est, _fec, id_topico, _ur) in funcs:
+            for ing in elegir_3(id_topico):
                 asign_funcs.append((fid, ing))
+        execute_batch(
+            cur,
+            "INSERT INTO Asignacion_Funcionalidad (id_funcionalidad, ing_rut) "
+            "VALUES (%s, %s) ON CONFLICT (id_funcionalidad, ing_rut) DO NOTHING",
+            asign_funcs,
+        )
 
-        if asign_funcs:
-            execute_batch(cur,
-                          "INSERT INTO Asignacion_Funcionalidad (id_funcionalidad, ing_rut) VALUES (%s, %s) ON CONFLICT (id_funcionalidad, ing_rut) DO NOTHING",
-                          asign_funcs)
-
-        # Asignaciones de errores
         asign_bugs = []
-        for bid in range(1, NUM_BUGS + 1):
-            k = random.randint(1, 2)
-            chosen = random.sample(ing_ruts, k)
-            for ing in chosen:
+        for (bid, _tit, _desc, _fec, _est, id_topico, _ur) in bugs:
+            for ing in elegir_3(id_topico):
                 asign_bugs.append((bid, ing))
-
-        if asign_bugs:
-            execute_batch(cur,
-                          "INSERT INTO Asignacion_Error (id_bug, ing_rut) VALUES (%s, %s) ON CONFLICT (id_bug, ing_rut) DO NOTHING",
-                          asign_bugs)
+        execute_batch(
+            cur,
+            "INSERT INTO Asignacion_Error (id_bug, ing_rut) "
+            "VALUES (%s, %s) ON CONFLICT (id_bug, ing_rut) DO NOTHING",
+            asign_bugs,
+        )
 
         conn.commit()
 
-        print(f"Insertados: {len(topics)} tópicos, {len(users)} usuarios, {len(ings)} ingenieros, {len(funcs)} funcionalidades, {len(bugs)} errores.")
-        print(f"Criterios creados: {len(criterios)}. Asign. funcionalidad: {len(asign_funcs)}. Asign. errores: {len(asign_bugs)}")
+        print(
+            f"Insertados: {len(topics)} tópicos, {len(users)} usuarios, {len(ings)} ingenieros, "
+            f"{len(funcs)} funcionalidades, {len(bugs)} errores."
+        )
+        print(
+            f"Criterios creados: {len(criterios)}. "
+            f"Asign. funcionalidad: {len(asign_funcs)}. Asign. errores: {len(asign_bugs)}"
+        )
 
-    except Exception as e:
+    except Exception:
         conn.rollback()
         raise
     finally:
