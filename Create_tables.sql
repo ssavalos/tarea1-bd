@@ -20,7 +20,6 @@ CREATE TABLE Ingeniero (
 CREATE TABLE Ingeniero_Especialidad (
     id_topico INT,
     ing_rut VARCHAR(12),
-    especialidad VARCHAR(100),
     PRIMARY KEY (id_topico, ing_rut),
     FOREIGN KEY (id_topico) REFERENCES Topico(id_topico),
     FOREIGN KEY (ing_rut) REFERENCES Ingeniero(ing_rut)
