@@ -66,21 +66,6 @@ def main():
     )
     cur = conn.cursor()
 
-    # === Ejecutar Triggers.sql antes de poblar (idempotente) ===
-    def run_sql_file(cur, filename):
-        if not os.path.exists(filename):
-            raise FileNotFoundError(f"No se encontró el archivo SQL: {filename}")
-        with open(filename, "r", encoding="utf-8") as f:
-            cur.execute(f.read())
-
-    try:
-        run_sql_file(cur, "Triggers.sql")
-        conn.commit()
-        print("Triggers creados/actualizados desde 'Triggers.sql'.")
-    except Exception as e:
-        conn.rollback()
-        raise RuntimeError(f"Error al ejecutar 'Triggers.sql': {e}")
-
     try:
         # ======================
         # 1) Catálogo de tópicos
