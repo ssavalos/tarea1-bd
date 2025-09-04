@@ -1,8 +1,6 @@
-#!/usr/bin/env python3
-"""poblar_base_de_datos.py
 
-Script para poblar la base de datos PostgreSQL definida en este repositorio.
-
+"""
+Script para poblar la base de datos :D
 Genera:
 - 50 Usuarios
 - 80 Ingenieros
@@ -37,7 +35,7 @@ NUM_USERS = 50
 NUM_ING = 80
 NUM_BUGS = 300
 NUM_FUNCS = 200
-NUM_TOPICS = 3  # Backend, Seguridad, UX/UI
+NUM_TOPICS = 3  
 NUM_CRITERIA = 3
 
 
@@ -49,7 +47,6 @@ def random_date(start_year=2023, end_year=2025):
 
 
 def generate_rut():
-    """Genera un RUT chileno aleatorio en formato XXXXXXXX-X"""
     rut = random.randint(1_000_000, 25_000_000)
     dv_options = list(map(str, range(10))) + ["K"]
     dv = random.choice(dv_options)
@@ -67,9 +64,7 @@ def main():
     cur = conn.cursor()
 
     try:
-        # ======================
-        # 1) Catálogo de tópicos
-        # ======================
+        #Topicos
         topics = [
             (1, "Backend"),
             (2, "Seguridad"),
@@ -82,9 +77,7 @@ def main():
             topics,
         )
 
-        # ===============
-        # 2) Usuarios
-        # ===============
+        #Usuarios
         user_ruts, users = [], []
         for _ in range(NUM_USERS):
             rut = generate_rut()
@@ -97,9 +90,7 @@ def main():
             users,
         )
 
-        # ===============
-        # 3) Ingenieros
-        # ===============
+        #Ingenieros
         ing_ruts, ings = [], []
         for _ in range(NUM_ING):
             rut = generate_rut()
@@ -112,9 +103,8 @@ def main():
             ings,
         )
 
-        # ==========================================
-        # 4) Especialidades (1–2 por ingeniero)
-        # ==========================================
+        #Especialidades
+
         ing_especial = []
         for ing in ing_ruts:
             k = random.randint(1, min(2, NUM_TOPICS))  # máx 2 por trigger
@@ -129,16 +119,18 @@ def main():
                 ing_especial,
             )
 
-        # ---- Asegurar ≥ 3 especialistas por cada tópico (para poder asignar 3) ----
+        #Asegurar 3 especialistas por cada tópico
         cur.execute("SELECT id_topico, COUNT(*) FROM Ingeniero_Especialidad GROUP BY id_topico")
         faltantes = {t: max(0, 3 - c) for t, c in cur.fetchall()}
         for t, faltan in faltantes.items():
             while faltan > 0:
                 cand = random.choice(ing_ruts)
+                
                 # respeta el trigger de máx. 2 especialidades
                 cur.execute("SELECT COUNT(*) FROM Ingeniero_Especialidad WHERE ing_rut = %s", (cand,))
                 if cur.fetchone()[0] >= 2:
                     continue
+                
                 # evita duplicar misma especialidad
                 cur.execute(
                     "SELECT 1 FROM Ingeniero_Especialidad WHERE ing_rut = %s AND id_topico = %s",
@@ -146,6 +138,7 @@ def main():
                 )
                 if cur.fetchone():
                     continue
+                
                 cur.execute(
                     "INSERT INTO Ingeniero_Especialidad (id_topico, ing_rut) VALUES (%s, %s) "
                     "ON CONFLICT DO NOTHING",
@@ -153,13 +146,13 @@ def main():
                 )
                 faltan -= 1
 
-        # ===================================
-        # 5) Funcionalidades (con tope 25/día)
-        # ===================================
+        #Funcionalidades
+
         estados_func = ["Abierto", "En Progreso", "Resuelto", "Cerrado"]
         cuenta_func_dia = defaultdict(int)  # (user_rut, fecha) -> conteo
         funcs = []
         for fid in range(1, NUM_FUNCS + 1):
+            
             # respetar trigger: máx 25 por día/usuario
             while True:
                 fecha = random_date(2023, 2025)
@@ -187,9 +180,8 @@ def main():
             funcs,
         )
 
-        # ===============================
-        # 6) Criterios de aceptación (3)
-        # ===============================
+        #Criterios de aceptación 
+
         criterios, criterio_id = [], 1
         for fid in range(1, NUM_FUNCS + 1):
             for _ in range(NUM_CRITERIA):
@@ -202,13 +194,12 @@ def main():
             criterios,
         )
 
-        # =================================
-        # 7) Errores (con tope 25 por día)
-        # =================================
+       #Errores
         estados_bug = ["Abierto", "En Progreso", "Resuelto", "Cerrado"]
         cuenta_bug_dia = defaultdict(int)  # (user_rut, fecha) -> conteo
         bugs = []
         for bid in range(1, NUM_BUGS + 1):
+            
             # respetar trigger: máx 25 por día/usuario
             while True:
                 fecha = random_date(2023, 2025)
@@ -233,9 +224,7 @@ def main():
             bugs,
         )
 
-        # ===========================================================
-        # 8) Asignaciones: exactamente 3 especialistas por solicitud
-        # ===========================================================
+        #Asignaciones
         especialistas_por_topico = defaultdict(list)
         cur.execute("SELECT id_topico, ing_rut FROM Ingeniero_Especialidad")
         for t, r in cur.fetchall():
@@ -291,7 +280,3 @@ def main():
     finally:
         cur.close()
         conn.close()
-
-
-if __name__ == '__main__':
-    main()

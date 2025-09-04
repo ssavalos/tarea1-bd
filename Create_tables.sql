@@ -1,5 +1,3 @@
--- Aqui van las tablas, llaves primarias y foraneas
-
 CREATE TABLE Usuario (
     user_rut VARCHAR(12) PRIMARY KEY CHECK (user_rut ~ '^[0-9]{7,8}-[0-9K]$'),
     nombre VARCHAR(100),
