@@ -62,7 +62,3 @@ finally:
         cur.close()
     if 'conn' in locals():
         conn.close()
-
-if __name__ == "__main__":
-    main()
-
