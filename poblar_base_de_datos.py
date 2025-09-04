@@ -1,4 +1,3 @@
-
 """
 Script para poblar la base de datos :D
 Genera:
@@ -35,7 +34,7 @@ NUM_USERS = 50
 NUM_ING = 80
 NUM_BUGS = 300
 NUM_FUNCS = 200
-NUM_TOPICS = 3  
+NUM_TOPICS = 10  
 NUM_CRITERIA = 3
 
 
@@ -69,6 +68,13 @@ def main():
             (1, "Backend"),
             (2, "Seguridad"),
             (3, "UX/UI"),
+            (4, "DevOps"),
+            (5, "Machine Learning"),
+            (6, "Testing"),
+            (7, "Cloud"),
+            (8, "Data Science"),
+            (9, "Mobile"),
+            (10, "Infraestructura"),
         ]
         execute_batch(
             cur,
@@ -155,13 +161,17 @@ def main():
             
             # respetar trigger: máx 25 por día/usuario
             while True:
-                fecha = random_date(2023, 2025)
+                fecha = random_date(2010, 2025)
                 user_rut = random.choice(user_ruts)
                 if cuenta_func_dia[(user_rut, fecha)] < 25:
                     cuenta_func_dia[(user_rut, fecha)] += 1
                     break
 
-            titulo = f"Funcionalidad {fid}"
+            titulo = faker.sentence(nb_words=5)
+            while len(titulo) < 20:
+                titulo += " " + faker.word()
+            titulo = titulo[:100]  
+            
             ambiente = random.choice(["Web", "Móvil"])
             resumen = faker.sentence(nb_words=10)
             estado = random.choice(estados_func)
@@ -202,7 +212,7 @@ def main():
             
             # respetar trigger: máx 25 por día/usuario
             while True:
-                fecha = random_date(2023, 2025)
+                fecha = random_date(2010, 2025)
                 user_rut = random.choice(user_ruts)
                 if cuenta_bug_dia[(user_rut, fecha)] < 25:
                     cuenta_bug_dia[(user_rut, fecha)] += 1
@@ -280,3 +290,6 @@ def main():
     finally:
         cur.close()
         conn.close()
+
+if __name__ == "__main__":
+    main()

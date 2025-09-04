@@ -62,3 +62,5 @@ finally:
         cur.close()
     if 'conn' in locals():
         conn.close()
+
+
